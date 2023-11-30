@@ -1,0 +1,5 @@
+output/*
+# dont gitignore output/.gitkeep
+!output/.gitkeep
+
+pnpm-lock.yaml
