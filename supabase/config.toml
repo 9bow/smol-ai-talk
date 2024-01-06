@@ -40,9 +40,9 @@ file_size_limit = "50MiB"
 [auth]
 # The base URL of your website. Used as an allow-list for redirects and for constructing URLs used
 # in emails.
-site_url = "https://smol.ai/talk"
+site_url = "https://talk.smol.ai/talk"
 # A list of *exact* URLs that auth providers are permitted to redirect to post authentication.
-additional_redirect_urls = ["http://localhost:3000/talk/api/auth/callback", "https://smol.ai/talk/api/auth/callback"]
+additional_redirect_urls = ["http://localhost:3000/talk/api/auth/callback", "https://talk.smol.ai/talk/api/auth/callback"]
 # How long tokens are valid for, in seconds. Defaults to 3600 (1 hour), maximum 604,800 seconds (one
 # week).
 jwt_expiry = 3600

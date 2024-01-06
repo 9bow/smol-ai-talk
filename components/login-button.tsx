@@ -31,7 +31,7 @@ export function LoginButton({
         console.log(`location.origin`, location.origin)
         const redirectLink =
           process.env.VERCEL_ENV === 'production'
-            ? `https://smol.ai/talk/api/auth/callback`
+            ? `https://talk.smol.ai/talk/api/auth/callback`
             : `${location.origin}/talk/api/auth/callback`
         await supabase.auth.signInWithOAuth({
           provider: 'github',
@@ -40,14 +40,14 @@ export function LoginButton({
       }}
       type="button"
       disabled={isLoading}
-      className="mb-4 h-10 w-full rounded-md bg-gray-800 text-white hover:bg-black disabled:bg-black/50"
+      className="w-full h-10 mb-4 text-white bg-gray-800 rounded-md hover:bg-black disabled:bg-black/50"
     >
       <span className="flex items-center justify-center">
         {isLoading ? (
           <IconSpinner className="mr-2 animate-spin" />
         ) : (
           <>
-            <GitHubLogoIcon className="mr-2 h-5 w-5" />
+            <GitHubLogoIcon className="w-5 h-5 mr-2" />
             Sign in with Github
           </>
         )}
