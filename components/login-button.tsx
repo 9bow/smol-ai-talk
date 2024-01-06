@@ -40,14 +40,14 @@ export function LoginButton({
       }}
       type="button"
       disabled={isLoading}
-      className="w-full h-10 mb-4 text-white bg-gray-800 rounded-md hover:bg-black disabled:bg-black/50"
+      className="mb-4 h-10 w-full rounded-md bg-gray-800 text-white hover:bg-black disabled:bg-black/50"
     >
       <span className="flex items-center justify-center">
         {isLoading ? (
           <IconSpinner className="mr-2 animate-spin" />
         ) : (
           <>
-            <GitHubLogoIcon className="w-5 h-5 mr-2" />
+            <GitHubLogoIcon className="mr-2 h-5 w-5" />
             Sign in with Github
           </>
         )}
