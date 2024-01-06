@@ -16,6 +16,6 @@ alter table "public"."users" add column "created_at" timestamp with time zone no
 
 alter table "public"."users" add column "deleted_at" timestamp with time zone;
 
-alter table "public"."users" add column "updated_at" timestamp with time zone not null;
+alter table "public"."users" add column "updated_at" timestamp with time zone not null default now();
 
 
