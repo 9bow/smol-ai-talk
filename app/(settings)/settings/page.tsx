@@ -3,6 +3,7 @@ import ProfileForm from '@/components/profile-form'
 import { Separator } from '@/components/ui/separator'
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
+import { Suspense } from 'react'
 
 export default async function SettingsProfilePage() {
   const cookieStore = cookies()
@@ -22,7 +23,9 @@ export default async function SettingsProfilePage() {
         </p>
       </div>
       <Separator />
-      <ProfileForm user={user} />
+      <Suspense fallback={<div>Loading...</div>}>
+        <ProfileForm user={user} />
+      </Suspense>
     </div>
   )
 }

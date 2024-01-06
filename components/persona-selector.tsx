@@ -84,7 +84,7 @@ export function PersonaSelector({ user, ...props }: PersonaSelectorProps) {
               </PopoverTrigger>
             </TooltipTrigger>
             <TooltipContent>
-              <p>{persona ? persona.prompt_name : 'Choose Persona'}</p>
+              <p>{persona ? persona.name : 'Choose Persona'}</p>
             </TooltipContent>
           </Tooltip>
           <PopoverContent align="start" className="w-[250px] p-0">
@@ -98,30 +98,30 @@ export function PersonaSelector({ user, ...props }: PersonaSelectorProps) {
               >
                 <div className="grid gap-2">
                   <h4 className="font-medium leading-none">
-                    {peekedPersona?.emoji} {peekedPersona?.prompt_name}
+                    {peekedPersona?.emoji} {peekedPersona?.name}
                   </h4>
-                  <div className="text-sm text-muted-foreground">
+                  <p className="line-clamp-6 text-sm text-muted-foreground">
                     {/* truncate for readbility */}
-                    {peekedPersona?.prompt_body
-                      ?.split(' ')
-                      .slice(0, 30)
-                      .join(' ') + '...'}
-                  </div>
-                  <Link
-                    href="/settings/personas"
-                    className="flex h-auto grow-0 p-0 text-sm"
-                  >
-                    <Button
-                      onClick={e => {
-                        e.preventDefault()
-                        router.push('/settings/personas')
-                      }}
-                      variant="link"
-                      className="h-auto p-0 text-sm"
+                    {peekedPersona?.body?.split(' ').slice(0, 30).join(' ') +
+                      '...'}
+                  </p>
+                  {!!peekedPersona?.id && (
+                    <Link
+                      href="/settings/personas"
+                      className="flex h-auto grow-0 p-0 text-sm"
                     >
-                      Edit
-                    </Button>
-                  </Link>
+                      <Button
+                        onClick={e => {
+                          e.preventDefault()
+                          router.push('/settings/personas')
+                        }}
+                        variant="link"
+                        className="h-auto p-0 text-sm"
+                      >
+                        Edit
+                      </Button>
+                    </Link>
+                  )}
                 </div>
               </HoverCardContent>
               <Command loop>
@@ -173,28 +173,14 @@ export function PersonaSelector({ user, ...props }: PersonaSelectorProps) {
             </HoverCard>
 
             <div className="flex flex-col items-start space-y-2 rounded-b-2xl border-t-2 border-t-foreground bg-background px-2 py-4 text-foreground">
-              <Link href="/" className="h-auto p-0 text-sm">
-                <Button
-                  onClick={e => {
-                    e.preventDefault()
-                    router.push('/settings/personas')
-                  }}
-                  variant="link"
-                  className="h-auto p-0 text-sm"
-                >
+              <Link href="/settings/personas" className="h-auto p-0 text-sm">
+                <Button variant="link" className="h-auto p-0 text-sm">
                   <IconPlus className="mr-2 text-muted-foreground" />
                   Add New
                 </Button>
               </Link>
               <Link href="/settings/personas" className="h-auto p-0 text-sm">
-                <Button
-                  onClick={e => {
-                    e.preventDefault()
-                    router.push('/settings/personas')
-                  }}
-                  variant="link"
-                  className="h-auto p-0 text-sm"
-                >
+                <Button variant="link" className="h-auto p-0 text-sm">
                   <Pencil1Icon className="mr-2 text-muted-foreground" />
                   Manage Personas
                 </Button>
@@ -242,7 +228,7 @@ function PersonaItem({
     >
       <div className="flex items-center justify-center space-x-2 truncate">
         <div>{persona.emoji}</div>
-        <div className="truncate">{persona.prompt_name}</div>
+        <div className="truncate">{persona.name}</div>
       </div>
       <IconCheck
         className={cn(

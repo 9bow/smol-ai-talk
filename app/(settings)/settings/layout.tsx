@@ -18,8 +18,8 @@ const sidebarNavItems = [
     href: '/settings/personas'
   },
   {
-    title: 'My Plan',
-    href: '/settings/plan'
+    title: 'Billing',
+    href: '/settings/billing'
   }
 ]
 

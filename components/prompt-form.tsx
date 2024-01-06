@@ -25,7 +25,15 @@ export function PromptForm({
   isLoading,
   setModel,
   model
-}: PromptProps) {
+}: {
+  user: any
+  onSubmit: (value: string) => Promise<void>
+  input: string
+  setInput: (value: string) => void
+  isLoading: boolean
+  setModel: (model: Model) => void
+  model: Model
+}) {
   const { formRef, onKeyDown } = useEnterSubmit()
   const inputRef = React.useRef<HTMLTextAreaElement>(null)
 
@@ -59,11 +67,11 @@ export function PromptForm({
       ref={formRef}
     >
       <div className="relative flex w-full flex-row bg-background sm:rounded-md sm:border sm:px-4">
-        {/* <div className="mt-4 flex gap-2">
+        {/* <div className="flex gap-2 mt-4">
           <PersonaSelector user={user} />
         </div>
 
-        <div className="right-6 top-4 flex justify-center gap-2 absolute"> */}
+        <div className="absolute flex justify-center gap-2 right-6 top-4"> */}
         <div className="absolute bottom-0 right-2 flex gap-2 sm:relative sm:mt-4">
           <PersonaSelector user={user} />
         </div>
@@ -79,11 +87,11 @@ export function PromptForm({
             <IconArrowElbow />
             <span className="sr-only">Send message</span>
           </Button>
-          <ModelSelector
+          {/* <ModelSelector
             setModel={setModel}
             setInput={setInput}
             model={model}
-          />
+          /> */}
         </div>
         <textarea
           ref={inputRef}

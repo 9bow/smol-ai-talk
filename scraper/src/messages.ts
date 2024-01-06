@@ -18,13 +18,12 @@ export async function sync_messages() {
     if (guild_data.channels == 'ALL') {
       guild_data.channels = await fetch_channels($fetch, guild_id)
       // exclude guild_data.ignore_channels
-      if (guild_data?.ignore_channels !== undefined) {
+      if (guild_data.ignore_channels) {
         guild_data.channels = guild_data.channels.filter(
-          channel => !guild_data?.ignore_channels.includes(channel.channel_name)
+          channel => !guild_data.ignore_channels?.includes(channel.channel_name)
         )
       }
     }
-
     const { channels, guild_name } = guild_data
 
     // prettier-ignore
@@ -52,7 +51,7 @@ export async function sync_messages() {
             )
           })
         }
-      } catch (err) {
+      } catch (err: any) {
         const errorCode = err.response?.data?.code || err.code
         if (errorCode === 50001) {
           console.log(

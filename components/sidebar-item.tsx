@@ -21,15 +21,15 @@ interface SidebarItemProps {
 
 export function SidebarItem({ onClick, chat, children }: SidebarItemProps) {
   const pathname = usePathname()
-  const isActive = pathname === chat.path
+  const isActive = pathname === `/chat/${chat.id}`
 
   // TODO: Remove this once we're clear on using `chat_id` or `id`
-  if (!chat?.chat_id && !chat?.id) return null
+  if (!chat.id) return null
 
   return (
     <div className="relative">
       <Link
-        href={chat.path}
+        href={`/chat/${chat.id}`}
         onClick={() => setTimeout(() => onClick && onClick(), 200)}
         className={cn(
           buttonVariants({ variant: 'ghost' }),
@@ -38,7 +38,7 @@ export function SidebarItem({ onClick, chat, children }: SidebarItemProps) {
         )}
       >
         <div className="absolute left-2 top-1 flex h-6 w-6 items-center justify-center">
-          {chat.sharePath ? (
+          {chat.isShared ? (
             <Tooltip delayDuration={1000}>
               <TooltipTrigger
                 tabIndex={-1}
@@ -55,9 +55,9 @@ export function SidebarItem({ onClick, chat, children }: SidebarItemProps) {
 
         <div
           className="relative max-h-5 flex-1 select-none overflow-hidden text-ellipsis break-all"
-          title={chat.title}
+          title={chat.title || 'New Chat'}
         >
-          <span className="whitespace-nowrap">{chat.title}</span>
+          <span className="whitespace-nowrap">{chat.title || 'New Chat'}</span>
         </div>
       </Link>
       {isActive && <div className="absolute right-2 top-1">{children}</div>}

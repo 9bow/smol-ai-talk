@@ -42,8 +42,6 @@ export function formatDate(input: string | number | Date): string {
   })
 }
 
-
-
 // thanks chatgpt
 export function stringToColor(str: string) {
   let hash = 0

@@ -1,5 +1,6 @@
 'use client'
 
+import { ArtifactItem } from '@/components/artifact-item'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -13,39 +14,50 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Database } from '@/lib/db_types'
 import { getUserInitials } from '@/lib/helpers'
-import { Chat } from '@/lib/types'
+import { Artifact, Chat } from '@/lib/types'
+import { useLayoutStore } from '@/lib/useLayoutStore'
+import { cn } from '@/lib/utils'
 import { Dialog, Transition } from '@headlessui/react'
-import {
-  Cross1Icon,
-  DoubleArrowLeftIcon,
-  DoubleArrowRightIcon,
-  HamburgerMenuIcon
-} from '@radix-ui/react-icons'
+import { Cross1Icon, HamburgerMenuIcon } from '@radix-ui/react-icons'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { User } from '@supabase/supabase-js'
 import { useTheme } from 'next-themes'
 import Image from 'next/image'
+import Link from 'next/link'
 import { redirect, usePathname, useRouter } from 'next/navigation'
-import { Fragment, useEffect, useMemo, useState, useTransition } from 'react'
+import {
+  Fragment,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  useTransition
+} from 'react'
 import { SidebarActions } from '../../components/sidebar-actions'
 import { SidebarItem } from '../../components/sidebar-item'
 import { removeChat, shareChat } from '../actions'
-import Link from 'next/link'
 
 type ChatLayoutProps = {
   serverChats: Chat[]
+  serverArtifacts: Artifact[]
   user?: User
   children: any
 }
 
 export default function ChatLayout({
   serverChats,
+  serverArtifacts,
   user,
   children
 }: ChatLayoutProps) {
-  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
-  const [sidebarOpen, setSidebarOpen] = useState(true)
   const [chats, setChats] = useState<Chat[]>(serverChats)
+  const [artifacts, setArtifacts] = useState<Artifact[]>(serverArtifacts)
+  const {
+    isSidebarOpen,
+    setSidebarOpen,
+    isMobileSidebarOpen,
+    setMobileSidebarOpen
+  } = useLayoutStore()
 
   const supabase = createClientComponentClient<Database>()
   const router = useRouter()
@@ -53,9 +65,12 @@ export default function ChatLayout({
   const { setTheme, theme } = useTheme()
   const [_, startTransition] = useTransition()
 
-  const onNavigate = (route: string) => {
-    router.push(route)
-  }
+  const onNavigate = useCallback(
+    (route: string) => {
+      router.push(route)
+    },
+    [router]
+  )
 
   const signOut = async () => {
     await supabase.auth.signOut()
@@ -69,22 +84,27 @@ export default function ChatLayout({
         onClick: () => onNavigate('/settings')
       },
       {
-        label: 'My Plan',
-        onClick: () => onNavigate('/settings/plan')
+        label: 'Billing',
+        onClick: () => onNavigate('/settings/billing')
       },
       {
         label: 'Settings',
         onClick: () => onNavigate('/settings')
       },
       {
-        label: theme === 'light' ? 'Dark Appearance' : 'Light Appearance',
+        label:
+          theme === 'light'
+            ? 'Dark Appearance'
+            : theme === 'dark'
+            ? 'Light Appearance'
+            : 'System Appearance',
         onClick: () =>
           startTransition(() => {
             setTheme(theme === 'light' ? 'dark' : 'light')
           })
       }
     ],
-    [theme]
+    [theme, onNavigate, setTheme]
   )
 
   useEffect(() => {
@@ -94,7 +114,7 @@ export default function ChatLayout({
         // @ts-ignore
         'postgres_changes',
         {
-          event: '*',
+          event: 'INSERT',
           schema: 'public',
           table: 'chats'
         },
@@ -108,9 +128,13 @@ export default function ChatLayout({
             setChats(prev => prev.filter(chat => chat.id !== payload.old.id))
           } else if (payload.eventType === 'INSERT') {
             setChats(prev =>
-              [payload?.new?.payload as Chat, ...prev].sort(
+              // as unkown because otherwise type error
+              [payload?.new as unknown as Chat, ...prev].sort(
                 (a: Chat, b: Chat) => {
-                  return b.createdAt - a.createdAt
+                  return (
+                    new Date(b.createdAt).valueOf() -
+                    new Date(a.createdAt).valueOf()
+                  )
                 }
               )
             )
@@ -121,7 +145,13 @@ export default function ChatLayout({
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [pathname])
+  }, [pathname, supabase])
+
+  const tabBarClassName = cn({
+    'transition-all duration-300 ease-in-out': true,
+    'translate-x-0': isSidebarOpen,
+    'lg:-translate-x-full': !isSidebarOpen
+  })
 
   if (!user) {
     return redirect('/sign-in')
@@ -129,7 +159,7 @@ export default function ChatLayout({
 
   return (
     <>
-      <Transition.Root show={mobileSidebarOpen} as={Fragment}>
+      <Transition.Root show={isMobileSidebarOpen} as={Fragment}>
         <Dialog
           as="div"
           className="relative z-50 lg:hidden"
@@ -181,13 +211,12 @@ export default function ChatLayout({
                     </button>
                   </div>
                 </Transition.Child>
-                {/* Sidebar component, swap this element with another sidebar if you like */}
-                <div className="flex grow flex-col gap-y-5 overflow-y-auto">
+                <div className="flex grow flex-col gap-y-5 overflow-y-auto overscroll-none">
                   <Sidebar
                     onSignOut={signOut}
-                    setOpen={setMobileSidebarOpen}
                     profileOptions={profileOptions}
                     chats={chats}
+                    artifacts={artifacts}
                     user={user}
                   />
                 </div>
@@ -197,18 +226,22 @@ export default function ChatLayout({
         </Dialog>
       </Transition.Root>
 
-      <div className="hidden h-screen lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:w-72 lg:flex-col">
+      <div
+        className={cn(
+          'hidden h-screen lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:w-72 lg:flex-col',
+          tabBarClassName
+        )}
+      >
         <Sidebar
-          profileOptions={profileOptions}
           onSignOut={signOut}
-          isOpen={sidebarOpen}
-          setOpen={setSidebarOpen}
+          profileOptions={profileOptions}
           chats={chats}
+          artifacts={artifacts}
           user={user}
         />
       </div>
 
-      <div className="sticky top-0 z-40 flex items-center gap-x-6 border-b p-4 sm:px-6">
+      <div className="sticky top-0 z-40 flex items-center gap-x-6 border-b bg-background p-4 sm:px-6">
         <button
           type="button"
           className="-m-2.5 p-2.5 lg:hidden"
@@ -217,7 +250,19 @@ export default function ChatLayout({
           <span className="sr-only">Open sidebar</span>
           <HamburgerMenuIcon className="h-6 w-6" aria-hidden="true" />
         </button>
-        <div className="flex-1 text-sm font-semibold leading-6">
+        <Button
+          onClick={() => setSidebarOpen(!isSidebarOpen)}
+          className={cn('hidden px-2 lg:block', isSidebarOpen && 'lg:hidden')}
+          variant={'ghost'}
+        >
+          <HamburgerMenuIcon />
+        </Button>
+        <div
+          className={cn(
+            isSidebarOpen && 'pl-72',
+            'flex-1 text-sm font-semibold leading-6 transition-all duration-300 ease-in-out'
+          )}
+        >
           <Link href="/">Chat</Link>
         </div>
         <DropdownMenu>
@@ -270,7 +315,12 @@ export default function ChatLayout({
         </DropdownMenu>
       </div>
 
-      <main className="flex h-full flex-1 flex-col bg-muted/50 lg:pl-72">
+      <main
+        className={cn(
+          'flex h-full flex-1 flex-col bg-muted/50 transition-all duration-300 ease-in-out',
+          isSidebarOpen && 'lg:pl-72'
+        )}
+      >
         <div>{children}</div>
       </main>
     </>
@@ -278,23 +328,27 @@ export default function ChatLayout({
 }
 
 const Sidebar = ({
-  isOpen,
-  setOpen,
   chats,
+  artifacts,
   user,
   profileOptions,
   onSignOut
 }: {
-  isOpen?: boolean
-  setOpen?: any
   chats: Chat[]
+  artifacts: Artifact[]
   user?: User
   profileOptions: any[]
   onSignOut: any
 }) => {
+  const { isSidebarOpen, setSidebarOpen } = useLayoutStore()
+
   return (
     <>
-      <div className="flex h-full flex-col overflow-y-hidden border-r bg-white dark:bg-black">
+      <div
+        className={
+          'flex h-full flex-col overflow-y-hidden border-r bg-white dark:bg-black'
+        }
+      >
         <div className="flex items-center justify-between border-b py-4 pl-4 pr-3">
           <div className="flex items-center">
             <h1 className="ml-2 font-semibold">
@@ -303,11 +357,11 @@ const Sidebar = ({
           </div>
           <div className="flex">
             <Button
-              onClick={() => setOpen(!isOpen)}
+              onClick={() => setSidebarOpen(!isSidebarOpen)}
               className="hidden px-2 lg:block"
               variant={'ghost'}
             >
-              {isOpen ? <DoubleArrowLeftIcon /> : <DoubleArrowRightIcon />}
+              <HamburgerMenuIcon />
             </Button>
           </div>
         </div>
@@ -332,11 +386,7 @@ const Sidebar = ({
                   {chats.map(
                     (chat: any, i: number) =>
                       chat && (
-                        <SidebarItem
-                          onClick={() => setOpen(false)}
-                          key={chat.id}
-                          chat={chat}
-                        >
+                        <SidebarItem key={`${chat.id}-${i}`} chat={chat}>
                           <SidebarActions
                             chat={chat}
                             removeChat={removeChat}
@@ -354,12 +404,30 @@ const Sidebar = ({
                 </div>
               )}
             </TabsContent>
-            <TabsContent value="discover">
-              <div className="p-8 text-center">
-                <p className="text-sm text-muted-foreground">
-                  Nothing to discover yet ;)
-                </p>
-              </div>
+            <TabsContent
+              value="discover"
+              className="h-full overflow-y-scroll px-4"
+            >
+              {artifacts?.length ? (
+                <div className="space-y-2">
+                  {artifacts.map(
+                    (artifact: any, i: number) =>
+                      artifact && (
+                        <ArtifactItem
+                          // onClick={() => setSidebarOpen(false)}
+                          key={artifact.id}
+                          artifact={artifact}
+                        />
+                      )
+                  )}
+                </div>
+              ) : (
+                <div className="p-8 text-center">
+                  <p className="text-sm text-muted-foreground">
+                    Nothing to discover yet ;)
+                  </p>
+                </div>
+              )}
             </TabsContent>
           </Tabs>
         </div>

@@ -1,5 +1,6 @@
-import { getPersonaById } from '@/app/actions'
+import { getIsSubscribed, getPersonaById } from '@/app/actions'
 import { Database } from '@/lib/db_types'
+import { type UserKvData } from '@/lib/types'
 import {
   createRouteHandlerClient,
   type User
@@ -11,70 +12,21 @@ import { Configuration, OpenAIApi } from 'smolai'
 
 import { auth } from '@/auth'
 import { Persona } from '@/constants/personas'
-import { nanoid } from '@/lib/utils'
+import { kv } from '@vercel/kv'
 // import { z } from 'zod'
 // import { zValidateReq } from '@/lib/validate'
-import { ChatCompletionFunctions } from 'smolai'
-import PromptBuilder from './prompt-builder'
+
+import PromptBuilder from '@/app/api/chat/prompt-builder'
+import { scrapePage } from '@/app/api/chat/scrape'
+import { processSearchResult, searchTheWeb } from '@/app/chat-functions'
+import { FREE_LIMIT, PAID_LIMIT, WINDOW_SIZE } from '@/constants/rate-limits'
+import { functionSchema } from '@/lib/functions'
+import { v4 } from 'uuid'
 
 export const runtime = 'nodejs'
 
-const processSearchResultSchema: ChatCompletionFunctions = {
-  name: 'processSearchResult',
-  description:
-    'Read the contents of the first or next search result and return it along with the remaining search results.',
-  parameters: {
-    type: 'object',
-    properties: {
-      title: {
-        type: 'string',
-        description: 'The title of the search result.'
-      },
-      url: {
-        type: 'string',
-        description: 'The URL of the search result.'
-      },
-      publishedDate: {
-        type: 'string',
-        description: 'The date the search result was published.'
-      },
-      author: {
-        type: 'string',
-        description: 'The author of the search result.'
-      },
-      score: {
-        type: 'number',
-        descripion:
-          'Relevance score of the search result on a scale of 0 to 1, with 1 being the most relevant.'
-      },
-      id: {
-        type: 'string',
-        description: 'Unique identifier for the search result.'
-      }
-    },
-    required: ['title', 'url', 'id']
-  }
-}
-
-const searchTheWebSchema: ChatCompletionFunctions = {
-  name: 'searchTheWeb',
-  description:
-    'Perform a web search and returns the top 20 search results based on the search query.',
-  parameters: {
-    type: 'object',
-    properties: {
-      query: {
-        type: 'string',
-        description: 'The query to search for.'
-      }
-    },
-    required: ['query']
-  }
-}
-
-const functionSchema = [searchTheWebSchema, processSearchResultSchema]
-
 export async function POST(req: Request) {
+  console.log('in POST /api/chat/route.ts')
   const cookieStore = cookies()
   const supabase = createRouteHandlerClient<Database>({
     cookies: () => cookieStore
@@ -85,7 +37,8 @@ export async function POST(req: Request) {
 
   const currentDate = new Date()
 
-  const userId = (await auth({ cookieStore }))?.user.id
+  const user = (await auth({ cookieStore }))?.user
+  const userId = user?.id
 
   if (!userId) {
     return new Response('Unauthorized', {
@@ -119,9 +72,9 @@ export async function POST(req: Request) {
     if (storedPersona?.id !== null) {
       promptBuilder.addTemplate('customPersona', {
         // @ts-ignore
-        personaName: storedPersona.prompt_name,
+        personaName: storedPersona.name,
         // @ts-ignore
-        personaBody: storedPersona.prompt_body
+        personaBody: storedPersona.body
       })
     }
   }
@@ -138,7 +91,7 @@ export async function POST(req: Request) {
   const openai = new OpenAIApi(configuration)
 
   const res = await openai.createChatCompletion({
-    model: model.id || 'gpt-4-0613',
+    model: model.id || 'gpt-4-1106-preview',
     messages: [
       systemPrompt,
       // personaPrompts,
@@ -153,7 +106,7 @@ export async function POST(req: Request) {
     console.log(key + ': ' + value)
   }
 
-  let id = json.id ?? nanoid()
+  let id = json.id ?? v4()
   const title = json.messages[0].content.substring(0, 100)
   const createdAt = Date.now()
   const path = `/chat/${id}`
@@ -179,14 +132,17 @@ export async function POST(req: Request) {
     return data?.id ? true : false
   }
 
-  const extractFirstUrl = async (content: string) => {
-    const regex = /(https?:\/\/[^\s]+)/g
+  const extractUrlArray = async (content: string) => {
+    const regex = /https?:\/\/\S+/gi
     const found = messages[0]?.content?.match(regex)
+    console.log(found)
 
     if (found && found.length > 0) {
-      const firstUrl = found[0]
-      console.log('✅', firstUrl) // Output the first URL found
-      return firstUrl
+      found.map((url: string) => {
+        console.log('✅', url) // Output the first URL found
+      })
+
+      return found
     } else {
       console.log('No URL found')
       return null
@@ -197,9 +153,9 @@ export async function POST(req: Request) {
   // check if the chat id already exists
   if (messages?.length === 1) {
     // while loop to check if chat id exists
-    // if it does, generate a new id
+    // if already exists, generate a new id
     while (await checkIfChatExists(id)) {
-      id = nanoid()
+      id = v4()
       payload = {
         ...payload,
         id,
@@ -207,103 +163,220 @@ export async function POST(req: Request) {
       }
     }
 
-    await supabase.from('chats').insert({ id, payload }).throwOnError()
+    await supabase.from('chats').insert({ id, payload, title }).throwOnError()
 
     // extract the first url from the first message
-    const extractedUrl = await extractFirstUrl(messages[0]?.content)
+    const extractedUrls = await extractUrlArray(messages[0]?.content)
 
-    if (extractedUrl) {
-      await supabase
-        .from('submissions')
-        .insert({
-          chat_id: id,
-          submitted_url: extractedUrl
-          //TODO add metadata from open graph
-          // meta: {}
-        })
-        .throwOnError()
+    if (extractedUrls) {
+      // create multiple submissions
+      extractedUrls.map(async (url: string) => {
+        await scrapePage(url, id)
+          .then(res => res.json())
+          .then(data => data)
+          .catch(err => console.error(err))
+
+        // length of string divided by 4 is the number of tokens
+      })
     }
-  } else {
-    await supabase.from('chats').update({ payload }).eq('id', id).throwOnError()
   }
 
-  const stream = OpenAIStream(res, {
-    async onCompletion(completion) {
-      const payload = {
-        id,
-        title,
-        userId,
-        createdAt,
-        path,
-        messages: [
-          ...messages,
-          {
-            content: completion,
-            role: 'assistant'
-          }
-        ]
-      }
-      console.log(payload)
+  const { data } = await supabase
+    .from('messages')
+    .insert({
+      role: 'user',
+      content: messages[messages.length - 1].content,
+      chat_id: id
+    })
+    .throwOnError()
 
-      // Insert chat into database.
-      await supabase.from('chats').upsert({ id, payload }).throwOnError()
+  /**
+   * Rate limiter
+   */
+  const now = new Date()
+
+  const defaultKvData: UserKvData = {
+    userWindowStart: now,
+    userMsgCount: 0
+  }
+
+  const userRateLimit = (await getIsSubscribed(user)) ? PAID_LIMIT : FREE_LIMIT
+  console.log('userRateLimit', userRateLimit)
+  // Hack to reset kv data for testing
+  // let userKvData = defaultKvData;
+
+  let userKvData: UserKvData | null = await kv.get(user.id)
+  if (userKvData === null) userKvData = defaultKvData
+
+  const isWithinWindow =
+    Number(now) - Number(userKvData.userWindowStart) < WINDOW_SIZE
+
+  if (!isWithinWindow) {
+    // If window has passed, reset the window and message count
+
+    userKvData.userWindowStart = now
+    userKvData.userMsgCount = 0
+  } else if (isWithinWindow && userKvData.userMsgCount >= userRateLimit) {
+    // If window has not passed, and message count is over limit,
+    // return error message
+
+    const resetTime = new Date(Number(userKvData.userWindowStart) + WINDOW_SIZE)
+
+    // Calculate the time difference in milliseconds
+    const timeDifference = resetTime.getTime() - now.getTime()
+
+    // Convert to minutes
+    const minutesLeft = Math.ceil(timeDifference / 1000 / 60)
+
+    // Create the error response
+    const errorResponse = {
+      content: `You have reached the rate limit for your plan level. Your limit will reset in ${minutesLeft} minutes.`,
+      role: 'assistant',
+      assistantType: 'error'
     }
 
-    //   experimental_onFunctionCall: async (
-    //     { name, arguments: args },
-    //     createFunctionCallMessages
-    //   ) => {
-    //     // if you skip the function call and return nothing, the `function_call`
-    //     // message will be sent to the client for it to handle
-    //     if (name === 'searchTheWeb') {
-    //       console.log('🔵 called searchTheWeb: ', args)
+    // Return the response as a 200 so that it will appear in the chat
+    // This will prevent further execution of this route, so this message will
+    // appear as the last message in the chat list. (Will not be saved to db)
+    return new Response(JSON.stringify(errorResponse), { status: 200 })
+  } else {
+    // If window has not passed and message count is under limit,
+    // increment message count
 
-    //       const results = await searchTheWeb(args.query as string)
-    //       console.log('🟢 results: ', results)
+    userKvData.userMsgCount++
+  }
 
-    //       try {
-    //         JSON.stringify(results)
-    //       } catch (e) {
-    //         console.error('Serialization error: ', e)
-    //       }
+  await kv.set(user.id, userKvData)
 
-    //       if (results === undefined) {
-    //         return 'Sorry, I could not find anything on the internet about that.'
-    //       }
+  // Instantiate the StreamData. It works with all API providers.
+  // const data = new experimental_StreamData()
 
-    //       // Generate function messages to keep in conversation context.
-    //       // @ts-ignore
-    //       const newMessages = createFunctionCallMessages(results)
-    //       console.log('🟠 newMessages: ', newMessages)
+  const stream = OpenAIStream(res, {
+    experimental_onFunctionCall: async (
+      { name, arguments: args },
+      createFunctionCallMessages
+    ) => {
+      console.log('route.ts > onFunctionCall', name, args)
 
-    //       return openai.createChatCompletion({
-    //         messages: [...messages, ...newMessages],
-    //         stream: true,
-    //         model: 'gpt-4-0613',
-    //         functions: functionSchema
-    //       })
-    //     }
-    //     if (name === 'processSearchResult') {
-    //       console.log('🔵 called processSearchResult: ', args)
+      /* ========================================================================== */
+      /* Handle searchTheWeb function call                                          */
+      /* ========================================================================== */
 
-    //       // @ts-ignore
-    //       const processedResults = await processSearchResult(args)
-    //       console.log('🟢 processedResults: ', processedResults)
+      if (name === 'searchTheWeb') {
+        if (args && args.query) {
+          const results = await searchTheWeb(args.query as string)
 
-    //       // Generate function messages to keep conversation context.
-    //       // @ts-ignore
-    //       const newMessages = createFunctionCallMessages(processedResults)
-    //       console.log('🟠 newMessages: ', newMessages)
+          // data.append({
+          //   text: 'Searching the web...'
+          // })
 
-    //       return openai.createChatCompletion({
-    //         messages: [...messages, ...newMessages],
-    //         stream: true,
-    //         model: 'gpt-4-0613',
-    //         functions: functionSchema
-    //       })
-    //     }
-    //   }
+          const newMessages = createFunctionCallMessages(
+            results ||
+              'Sorry, I could not find anything on the internet about that.'
+          )
+
+          console.log('route.ts > searchTheWeb', newMessages)
+
+          return openai.createChatCompletion({
+            messages: [...messages, ...newMessages],
+            stream: true,
+            model: model.id || 'gpt-4-1106-preview',
+            functions: functionSchema
+          })
+        }
+      }
+
+      /* ========================================================================== */
+      /* Handle processSearchResult function call                                   */
+      /* ========================================================================== */
+
+      if (name === 'processSearchResult') {
+        const { title, url, id, publishedDate, author, score } = args
+
+        const processedContent = await processSearchResult(id as string)
+
+        const newMessages = createFunctionCallMessages(
+          JSON.stringify({
+            link: {
+              title: title,
+              url: url,
+              publishedDate: publishedDate || null,
+              author: author || null,
+              score: score || null,
+              id: id
+            },
+            results: processedContent
+          })
+        )
+
+        console.log('route.ts > processSearchResult', newMessages)
+
+        return openai.createChatCompletion({
+          messages: [...messages, ...newMessages],
+          stream: true,
+          model: model.id || 'gpt-4-1106-preview',
+          functions: functionSchema
+        })
+      }
+    },
+
+    async onCompletion(completion) {
+      console.log('✅ completion: ', completion)
+
+      try {
+        const parsedCompletion = JSON.parse(completion)
+        if (parsedCompletion?.function_call) {
+          // insert function call into database
+          const { error } = await supabase
+            .from('messages')
+            .insert({
+              role: 'assistant',
+              function_call: parsedCompletion.function_call,
+              chat_id: id
+            })
+            .throwOnError()
+        } else if (parsedCompletion?.role === 'function') {
+          // insert function call into database
+          const { error } = await supabase
+            .from('messages')
+            .insert({
+              role: 'function',
+              content: completion,
+              chat_id: id
+            })
+            .throwOnError()
+        }
+      } catch (e) {
+        console.log(e)
+        // insert message into database
+        console.log('insert message into database', {
+          role: 'assistant',
+          content: completion,
+          chat_id: id
+        })
+        const { error } = await supabase
+          .from('messages')
+          .insert({
+            role: 'assistant',
+            content: completion,
+            chat_id: id
+          })
+          .throwOnError()
+      }
+    },
+    onFinal(completion) {
+      // IMPORTANT! you must close StreamData manually or the response will never finish.
+      // data.close()
+    }
+    // IMPORTANT! until this is stable, you must explicitly opt in to supporting streamData.
+    // experimental_streamData: true
   })
 
+  // data.append({
+  //   text: 'Hello, how are you?'
+  // })
+
+  // console.log('route.ts > stream', stream)
   return new StreamingTextResponse(stream)
+  // return new StreamingTextResponse(stream, {}, data)
 }

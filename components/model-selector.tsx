@@ -4,8 +4,20 @@ import { PopoverProps } from '@radix-ui/react-popover'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import * as React from 'react'
-
+import { zodResolver } from "@hookform/resolvers/zod"
+import { useForm } from "react-hook-form"
+import * as z from "zod"
+import {
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form"
 import { Button } from '@/components/ui/button'
+import { Checkbox } from "@/components/ui/checkbox"
 import {
   Command,
   CommandEmpty,
@@ -39,30 +51,55 @@ interface ModelSelectorProps extends PopoverProps {
   model: Model
 }
 
-const exampleMessages = [
+
+const items = [
   {
-    heading: 'Explain technical concepts',
-    message: `What is a "serverless function"?`
+    id: "rag-smol",
+    label: "RAG (Smol.ai)",
   },
   {
-    heading: 'Summarize an article',
-    message: 'Summarize the following article for a 2nd grader:'
+    id: "search-metaphor",
+    label: "Search (Metaphor)",
   },
   {
-    heading: 'Draft an email',
-    message: `Draft an email to my boss about the following:`
-  }
-]
+    id: "interpreter-modal",
+    label: "Interpreter (Modal)",
+  },
+  {
+    id: "tool-dalle3",
+    label: "Images (OpenAI)",
+  },
+] as const
+ 
+const FormSchema = z.object({
+  items: z.array(z.string()).refine((value) => value.some((item) => item), {
+    message: "You have to select at least one item.",
+  }),
+})
 
 export function ModelSelector({
   setModel,
   setInput,
   model,
   ...props
-}: ModelSelectorProps) {
+}: {
+  setModel: (model: Model) => void
+  setInput: (value: string) => void
+  model: Model
+}) {
   const [open, setOpen] = React.useState(false)
   const router = useRouter()
   const [peekedModel, setPeekedModel] = React.useState<Model>(models[0])
+
+
+  // https://ui.shadcn.com/docs/components/checkbox
+  const form = useForm<z.infer<typeof FormSchema>>({
+    resolver: zodResolver(FormSchema),
+    defaultValues: {
+      items: ["rag-smol", "metaphor-search"],
+    },
+  })
+
 
   return (
     <div className="grid gap-2">
@@ -108,9 +145,9 @@ export function ModelSelector({
             </Link>
 
             <Label className="mb-2 text-xs text-muted-foreground">
-              Template
+              Quick Toggle Capabilities
             </Label>
-            {exampleMessages.map((message, index) => (
+            {/* {exampleMessages.map((message, index) => (
               <Button
                 key={index}
                 variant="link"
@@ -121,8 +158,53 @@ export function ModelSelector({
               >
                 <IconArrowRight className="mr-2 text-muted-foreground" />
                 {message.heading}
-              </Button>
-            ))}
+              </Button> */}
+              <Form {...form}>
+                <form className="space-y-8">
+                  <FormField
+                    control={form.control}
+                    name="items"
+                    render={() => (
+                      <FormItem>
+                        {items.map((item) => (
+                          <FormField
+                            key={item.id}
+                            control={form.control}
+                            name="items"
+                            render={({ field }) => {
+                              return (
+                                <FormItem
+                                  key={item.id}
+                                  className="flex flex-row items-start space-x-3 space-y-0"
+                                >
+                                  <FormControl>
+                                    <Checkbox
+                                      checked={field.value?.includes(item.id)}
+                                      onCheckedChange={(checked: boolean) => {
+                                        return checked
+                                          ? field.onChange([...field.value, item.id])
+                                          : field.onChange(
+                                              field.value?.filter(
+                                                (value) => value !== item.id
+                                              )
+                                            )
+                                      }}
+                                    />
+                                  </FormControl>
+                                  <FormLabel className="text-sm font-normal">
+                                    {item.label}
+                                  </FormLabel>
+                                </FormItem>
+                              )
+                            }}
+                          />
+                        ))}
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </form>
+              </Form>
           </div>
           <HoverCard>
             <HoverCardContent

@@ -23,33 +23,33 @@ import { createOrUpdatePersona, removePersona } from '../../../actions'
 
 export function PersonaForm({
   user,
-  prompt,
+  persona,
   onUpdate,
   onRemove
 }: {
   user: any
-  prompt: any
+  persona: any
   onUpdate: Function
   onRemove: Function
 }) {
-  const [isEditing, setEditing] = React.useState(!prompt.prompt_name || false)
+  const [isEditing, setEditing] = React.useState(!persona.name || false)
   const [isRemoving, setRemoving] = React.useState(false)
 
   let formSchema: z.ZodRawShape = {
-    prompt_id: z.coerce.number().optional(),
-    prompt_name: z.string(),
-    prompt_body: z.string(),
-    prompt_emoji: z.string().optional()
+    id: z.coerce.number().optional(),
+    name: z.string(),
+    body: z.string(),
+    emoji: z.string().optional()
   }
 
   const emojiset = '🤖 ✨ 🙏 🥰 🥺 🔥 🚢 🚀 🐍 🐣'
   // randomly select from emojiset
   const randomEmoji = emojiset.split(' ')[Math.floor(Math.random() * 10)]
   const defaultValues: any = {
-    prompt_id: prompt.id || null,
-    prompt_name: prompt.prompt_name || '',
-    prompt_body: prompt.prompt_body || '',
-    prompt_emoji: prompt.emoji || randomEmoji
+    id: persona.id || null,
+    name: persona.name || '',
+    body: persona.body || '',
+    emoji: persona.emoji || randomEmoji
   }
 
   const finalFormSchema = z.object(formSchema)
@@ -84,7 +84,7 @@ export function PersonaForm({
         }
       })
       reset({ ...values, ...result })
-      await onUpdate(prompt)
+      await onUpdate(persona)
       setEditing(false)
     } catch (error) {
       console.error('Error Updating User:', error)
@@ -94,7 +94,7 @@ export function PersonaForm({
   async function onRemovePersona() {
     try {
       setRemoving(true)
-      await removePersona({ id: prompt.id, user })
+      await removePersona({ id: persona.id, user })
       toast.success('Persona removed successfully', {
         style: {
           borderRadius: '10px',
@@ -107,7 +107,7 @@ export function PersonaForm({
           secondary: 'black'
         }
       })
-      onRemove(prompt.id)
+      onRemove(persona.id)
       setRemoving(false)
     } catch (error) {
       console.error('Error Deleting Persona:', error)
@@ -120,8 +120,8 @@ export function PersonaForm({
 
   const onCancel = async () => {
     reset()
-    if (!prompt.id) {
-      onRemove(prompt.id)
+    if (!persona.id) {
+      onRemove(persona.id)
     }
     setEditing(false)
   }
@@ -132,10 +132,10 @@ export function PersonaForm({
         <CardHeader className="flex flex-row justify-between space-y-0">
           <div className="space-y-2.5">
             <CardTitle>
-              {prompt.emoji} {prompt.prompt_name}
+              {persona.emoji} {persona.name}
             </CardTitle>
             <CardDescription className="whitespace-pre-line">
-              {prompt.prompt_body}
+              {persona.body}
             </CardDescription>
           </div>
           <Button variant={'outline'} type="button" onClick={onEdit}>
@@ -161,7 +161,7 @@ export function PersonaForm({
 
                 <div className="flex justify-between space-x-2">
                   <div>
-                    {!!prompt.id && (
+                    {!!persona.id && (
                       <Button
                         type="button"
                         onClick={onRemovePersona}

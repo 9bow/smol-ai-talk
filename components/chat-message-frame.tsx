@@ -1,0 +1,40 @@
+'use client'
+
+import { ChatMessageCard } from '@/components/chat-message-card'
+import { ChatMessageLogs } from '@/components/chat-message-logs'
+import { Message, ToolLog } from '@/lib/types'
+
+// Some test logs for design
+const TEST_LOGS = [
+  {
+    type: 'functionCall',
+    name: 'metaphorSearch',
+    arguments:
+      '{"query":"Busta Rhymes incident Santa Clara 9 days ago with Jay Z and Donald Trump"}',
+    status: 'resolved',
+    content:
+      '{"content":{"autopromptString":"Here is an article about the recent Busta Rhymes incident in Santa Clara involving Jay Z and Donald Trump:","results":[{"title":"Gym employee details the day Busta Rhymes ‘assaulted’ him","url":"https://pagesix.com/2015/11/16/gym-employee-details-the-day-busta-rhymes-assaulted-him/","publishedDate":"2015-11-16","author":"Rebecca Rosenberg","id":"TeuwTc0By3FD7CBxjD2Fig","score":0.134671151638031},{"title":"Busta Rhymes and Q-Tip ‘Knew’ Donald Trump Would Win","url":"https://www.vulture.com/2016/11/busta-rhymes-q-tip-knew-trump-would-win.html","publishedDate":"2016-11-13","author":"Jada Yuan","id":"ivMsIrYW7SjLelRQp9v9Kg","score":0.12641111016273499},{"title":"Why Jay-Z and these 11 hip-hop stars see a silver lining to Trump | CNN Politics","url":"https://www.cnn.com/2017/11/29/politics/jay-z-donald-trump-hip-hop/index.html","publishedDate":"2017-11-29","author":"Deena Zaru","id":"Qhxg9449tu6amNH6tttQzg","score":0.12229305505752563},{"title":"\'I was levitating\': Rapper Busta Rhymes on his show-stopping Grammys performance","url":"https://www.latimes.com/entertainment-arts/music/story/2023-02-06/busta-rhymes-grammys-2023-hip-hop-medley-anniversary","publishedDate":"2023-02-06","author":"August Brown","id":"nAsWcntZkIEMi_ppkm86fg","score":0.11563943326473236},{"title":"Hip-hop reacts to Trump: \'I\'d rather an ugly truth than a beautiful lie\' | CNN Politics","url":"https://www.cnn.com/2017/08/16/politics/hip-hop-donald-trump-white-supremacy/index.html","publishedDate":"2017-08-16","author":"Deena Zaru","id":"ZdVYDHY-GGKGRavKAIhjjQ","score":0.10882580280303955},{"title":"Jay-Z says Trump is ‘in pain.’ Trump responds by bragging about helping Black people","url":"https://www.thestar.com/news/world/2018/01/28/jay-z-says-trump-is-in-pain-trump-responds-by-bragging-about-helping-black-people.html","publishedDate":"2018-01-28","author":"Amy B Wang","id":"b7ikweUCcbVlT70yz-keQw","score":0.10677526891231537},{"title":"7 hip-hop stars making America \'woke\' again | CNN Politics","url":"https://www.cnn.com/2017/12/31/politics/best-hip-hop-2017-politics/index.html","publishedDate":"2017-12-31","author":"Deena Zaru","id":"0qiwOSlwbYyQeLhjOkiq1Q","score":0.10537342727184296},{"title":"Jay-Z Fires Shots at Kanye West for Supporting Trump","url":"https://www.newsweek.com/jay-z-kanye-west-trump-1238581","publishedDate":"2018-11-30","author":"Janice Williams","id":"EgpoD9AVmvpbSz6mDIQLmg","score":0.1036369651556015},{"title":"Donald Trump’s fall from hip-hop grace: From rap icon to public enemy No. 1","url":"https://abcnews.go.com/Politics/donald-trumps-fall-hip-hop-grace-rap-icon/story?id=58411276","publishedDate":"2018-10-11","author":"ABC News","id":"dM-8A14LZO_El3VV3_WZMA","score":0.10235387086868286},{"title":"Poetic justice: how Jay-Z became a civil rights champion","url":"https://www.theguardian.com/music/2019/mar/12/how-jay-z-became-a-civil-rights-champion","publishedDate":"2019-03-12","author":"Khushbu Shah","id":"CilUY3RYB5mjXHgUoMrdnQ","score":0.10229627788066864}]}}'
+  },
+  {
+    type: 'functionCall',
+    name: 'readMetaphorResult',
+    arguments:
+      '{"title":"\'I was levitating\': Rapper Busta Rhymes on his show-stopping Grammys performance","url":"https://www.latimes.com/entertainment-arts/music/story/2023-02-06/busta-rhymes-grammys-2023-hip-hop-medley-anniversary","id":"nAsWcntZkIEMi_ppkm86fg"}',
+    status: 'resolved',
+    content:
+      '{"content":{"url":"https://www.latimes.com/entertainment-arts/music/story/2023-02-06/busta-rhymes-grammys-2023-hip-hop-medley-anniversary","id":"nAsWcntZkIEMi_ppkm86fg","title":"\'I was levitating\': Rapper Busta Rhymes on his show-stopping Grammys performance","extract":"<div><div> <p>The Grammys honored 50 years of hip-hop on Sunday with a medley from dozens of stars past and present, ranging from Grandmaster Flash to Lil Uzi Vert. But it was a 50-year-old, Brooklyn’s Busta Rhymes, who stole the show.</p><p>About two-thirds of the way through the 13-minute medley, Rhymes, dressed in a fire-engine-red pea coat, roared into his hook from the 1997 MTV staple “Put Your Hands Where My Eyes Can See,” then vaulted into a torrent of bars from his part on Chris Brown’s “<a href=\\"https://www.youtube.com/watch?v=8gyLR4NfMiI&amp;ab_channel=ChrisBrownVEVO\\">Look at Me Now</a>.” Rapping at the speed of sound, Rhymes looked to be in a trance; Jay-Z and other Grammys attendees leaped to their feet.</p><p>It was one of the evening’s most memorable moments, in a performance that just about did the impossible — showcased a whole genre from its birth to the present. Rhymes, who released a new EP, “The Fuse Is Lit,” in November, spoke to The Times by phone from L.A. the afternoon after his Grammy triumph.</p><div><figure> <div> <p>An array of stars during the 50th anniversary of hip-hop celebration at the 65th Grammy Awards.</p><p>(Robert Gauthier / Los Angeles Times)</p> </div> </figure></div><p><b>Your performance was a highlight from last night’s show. How are you feeling about the history made onstage?</b><br />There are very few moments in life when you wake up the next day, and you realize your reality wasn’t just a dream, that it was a real space, real people, real emotions. It’s been challenging to not shed tears; when I get to have a moment to myself, I’m going to shed some tears of joy.</p><p>This thing, hip-hop, gave birth to everything about me, how I’ve been blessed to provide for family, all the way down to the ways I think and speak. To have a direct impact on the world with my little contribution — this was a milestone moment of culture.</p><p><b>Walk us through the rehearsal process for that segment. How did you prepare for such an intense performance? </b><br />We had three rehearsals, one off-site, one on-site, and then a full dress rehearsal in the morning. I got to be with my big brothers and sisters that I learned so much from, the pioneers and architects of the culture: Queen Latifah, Grandmaster Flash and the Furious 5, Run-D.M.C., Scarface. And my younger brothers and sisters, too: Lil Uzi Vert, Glorilla, Future. I’m backstage, able to have hours of time with them in the same space just to hang out, to laugh, to go through memories, to ask questions I never got to ask. I don’t even know how to describe it.</p><p>I didn’t rehearse for my verses specifically; it was more for the flow of the sequence of the medley and to finesse the stop-and-go points. I’ve done that “Look at Me Now” verse so many times in the last 10 years — that was the practice. I’ve mastered the skill set to articulate it clearly at such a rapid pace.</p><p>It’s unbelievable to me that I got to be in the middle of that. I don’t know if this will ever happen again. Life ain’t promised to nobody, so I’ll be holding this forever. </p><p><b>What was going through your head the moment the spotlight hit you?</b><br />Watching everyone rap leading up to my part made me nervous as hell. I didn’t want to be the person to make a mistake or forget a lyric or trip on a wire. The anxiety was almost draining. But as soon as the moment came where they put us on our marks, my adrenaline went to 10. I just wanted to explode.</p><p>When"}}'
+  }
+] as ToolLog[]
+
+export default function ChatMessageFrame({ message }: { message: Message }) {
+  console.log('CHAT MESSAGE FRAME (logs)', message.toolLogs)
+
+  return (
+    <>
+      {message.toolLogs && message.toolLogs.length > 0 && (
+        <ChatMessageLogs message={message} />
+      )}
+      {message.content && <ChatMessageCard message={message} />}
+    </>
+  )
+}

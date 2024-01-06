@@ -6,6 +6,8 @@ import { redirect } from 'next/navigation'
 import { getPersonas } from '../../../actions'
 import { PersonasList } from './personas-list'
 
+export const revalidate = 0
+
 export default async function SettingsPersonasPage() {
   const cookieStore = cookies()
   const session = await auth({ cookieStore })

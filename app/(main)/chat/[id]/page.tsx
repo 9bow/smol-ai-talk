@@ -1,10 +1,9 @@
-import { type Metadata } from 'next'
-import { notFound, redirect } from 'next/navigation'
-
-import { auth } from '@/auth'
 import { getChat } from '@/app/actions'
+import { auth } from '@/auth'
 import { Chat } from '@/components/chat'
+import { type Metadata } from 'next'
 import { cookies } from 'next/headers'
+import { notFound, redirect } from 'next/navigation'
 
 export const runtime = 'edge'
 export const preferredRegion = 'home'
@@ -27,7 +26,7 @@ export async function generateMetadata({
 
   const chat = await getChat(params.id)
   return {
-    title: chat?.title.toString().slice(0, 50) ?? 'Chat'
+    title: chat?.title?.toString().slice(0, 50) ?? 'Chat'
   }
 }
 
@@ -45,11 +44,16 @@ export default async function ChatPage({ params }: ChatPageProps) {
     notFound()
   }
 
-  if (chat?.userId !== session?.user?.id) {
+  if (chat.userId !== session?.user?.id) {
     notFound()
   }
 
   return (
-    <Chat id={chat.id} user={session?.user} initialMessages={chat.messages} />
+    <Chat
+      key={chat.id}
+      id={chat.id}
+      user={session?.user}
+      initialMessages={chat.messages}
+    />
   )
 }

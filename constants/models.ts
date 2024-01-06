@@ -13,6 +13,16 @@ export interface Model<Type = string> {
 
 export const models: Model<ModelType>[] = [
   {
+    id: 'gpt-4-1106-preview',
+    name: 'gpt-4 "turbo"',
+    description:
+      'GPT-4 Turbo (preview!)',
+    type: 'OpenAI',
+    tokens: '128,000 tokens',
+    strengths:
+      'The latest GPT-4 model with improved instruction following, JSON mode, reproducible outputs, parallel function calling, and more. Returns a maximum of 4,096 output tokens. This preview model is not yet suited for production traffic.'
+  },
+  {
     id: 'gpt-4',
     name: 'gpt-4',
     description:

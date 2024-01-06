@@ -1,0 +1,9 @@
+{
+  "name": "smol-talk",
+  "main": "party/main.ts",
+  "compatibilityDate": "2023-10-31",
+  "parties": {
+    "ai": "party/ai.ts",
+    "chat": "party/chat.ts"
+  }
+}

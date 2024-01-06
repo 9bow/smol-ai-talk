@@ -5,13 +5,13 @@ export const envsSchema = z.object({
   METAPHOR_API_KEY: z.string(),
   AUTH_GITHUB_ID: z.string(),
   AUTH_GITHUB_SECRET: z.string(),
-  // KV_URL: z.string(),
-  // KV_REST_API_URL: z.string(),
-  // KV_REST_API_TOKEN: z.string(),
-  // KV_REST_API_READ_ONLY_TOKEN: z.string()
+  KV_URL: z.string(),
+  KV_REST_API_URL: z.string(),
+  KV_REST_API_TOKEN: z.string(),
+  KV_REST_API_READ_ONLY_TOKEN: z.string()
 })
 
-const _env = envsSchema.safeParse(process.env)
+const _env: any = envsSchema.safeParse(process.env)
 
 if (!_env.success) {
   console.error('Zod validation failed:', _env.error)
@@ -24,8 +24,8 @@ export const envs = {
   METAPHOR_API_KEY: _env.data.METAPHOR_API_KEY,
   AUTH_GITHUB_ID: _env.data.AUTH_GITHUB_ID,
   AUTH_GITHUB_SECRET: _env.data.AUTH_GITHUB_SECRET,
-  // KV_URL: _env.data.KV_URL,
-  // KV_REST_API_URL: _env.data.KV_REST_API_URL,
-  // KV_REST_API_TOKEN: _env.data.KV_REST_API_TOKEN,
-  // KV_REST_API_READ_ONLY_TOKEN: _env.data.KV_REST_API_READ_ONLY_TOKEN
+  KV_URL: _env.data.KV_URL,
+  KV_REST_API_URL: _env.data.KV_REST_API_URL,
+  KV_REST_API_TOKEN: _env.data.KV_REST_API_TOKEN,
+  KV_REST_API_READ_ONLY_TOKEN: _env.data.KV_REST_API_READ_ONLY_TOKEN
 }

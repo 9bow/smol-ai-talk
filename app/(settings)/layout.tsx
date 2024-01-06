@@ -1,7 +1,6 @@
+import SettingsLayout from '@/app/(settings)/settings-layout'
 import { getChats } from '@/app/actions'
-import MainLayout from '@/app/(main)/chat-layout'
 import { auth } from '@/auth'
-import { Header } from '@/components/header'
 import { cookies } from 'next/headers'
 
 export default async function Layout({
@@ -16,8 +15,7 @@ export default async function Layout({
 
   return (
     <div className="flex min-h-screen flex-col">
-      <Header chats={chats} user={user} />
-      <main className="flex flex-1 flex-col bg-muted/50">{children}</main>
+      <SettingsLayout user={user}>{children}</SettingsLayout>
     </div>
   )
 }

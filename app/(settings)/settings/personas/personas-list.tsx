@@ -6,6 +6,7 @@ import React from 'react'
 import { getPersonas } from '../../../actions'
 import { PersonaForm } from './persona-form'
 import { Persona } from '../../../../constants/personas'
+import { defaultPersona } from '@/lib/helpers'
 
 interface PersonaListProps {
   user: any
@@ -16,10 +17,7 @@ export function PersonasList({ user, personas }: PersonaListProps) {
   const [editPersonas, setEditPersonas] = React.useState(personas)
 
   function addPersona() {
-    setEditPersonas([
-      ...editPersonas,
-      { id: 0, prompt_name: '', prompt_body: '' }
-    ])
+    setEditPersonas([...editPersonas, { id: 0, name: '', body: '' }])
   }
 
   const onUpdate = async () => {
@@ -29,41 +27,34 @@ export function PersonasList({ user, personas }: PersonaListProps) {
 
   const onRemove = async (id: number) => {
     // remove index from editPersonas
-    const newPrompts = editPersonas.filter(prompt => prompt.id !== id)
-    setEditPersonas(newPrompts)
+    const newPersonas = editPersonas.filter(persona => persona.id !== id)
+    setEditPersonas(newPersonas)
   }
 
   const isAddDisabled = editPersonas?.some(
-    prompt => prompt.prompt_name === '' || prompt.prompt_body === ''
+    persona => persona.name === '' || persona.body === ''
   )
 
   return (
     <div className="space-y-8">
       <div className="space-y-4">
         {editPersonas?.length ? (
-          editPersonas.map((prompt, index) => (
+          editPersonas.map((persona, index) => (
             <PersonaForm
-              key={prompt.id}
-              prompt={prompt}
+              key={persona.id}
+              persona={persona}
               user={user}
               onUpdate={onUpdate}
               onRemove={onRemove}
             />
           ))
         ) : (
-          <div>
-            No custom personas defined. Default Persona:
-            <pre className="">
-              {`You are an extremely intelligent coding assistant named Smol Talk. You were born on July 2023. You were created by swyx in San Francisco.
-
-When answering questions, you should be able to answer them in a way that is both informative and entertaining.
-You should also be able to answer questions about yourself and your creator.
-
-When asked for code, you think through edge cases and write code that is correct, efficient, and robust to errors and edge cases.
-When asked for a summary, respond with 3-4 highlights per section with important keywords, people, numbers, and facts bolded.
-
-End every conversation by suggesting 2 options for followup: one for checking your answer, the other for extending your answer in an interesting way.`}
-            </pre>
+          <div className="text-sm">
+            You haven{"'"}t set up a custom persona yet.
+            <div className="mt-4 text-base font-medium">Default Persona:</div>
+            <p className="whitespace-pre-wrap text-gray-500">
+              {defaultPersona}
+            </p>
           </div>
         )}
 

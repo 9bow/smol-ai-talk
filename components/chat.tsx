@@ -1,8 +1,7 @@
 'use client'
 
-import { UseChatOptions, useChat, type Message } from 'ai/react'
-
 import { getPersonas } from '@/app/actions'
+import { PARTYKIT_HOST } from '@/app/env'
 import { ChatList } from '@/components/chat-list'
 import { ChatPanel } from '@/components/chat-panel'
 import { ChatScrollAnchor } from '@/components/chat-scroll-anchor'
@@ -17,114 +16,37 @@ import {
   DialogTitle
 } from '@/components/ui/dialog'
 import { Model, models } from '@/constants/models'
-import {
-  processSearchResult,
-  searchTheWeb
-} from '@/lib/functions/chat-functions'
 import { useLocalStorage } from '@/lib/hooks/use-local-storage'
-import { SmolTalkMessage } from '@/lib/types'
-import { cn, nanoid } from '@/lib/utils'
-import { ChatRequest, FunctionCallHandler } from 'ai'
+import { Artifact, BroadcastMessage, Message } from '@/lib/types'
+import { usePersonaStore } from '@/lib/usePersonaStore'
+import { cn } from '@/lib/utils'
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { usePathname, useRouter } from 'next/navigation'
+import PartySocket from 'partysocket'
+import usePartySocket from 'partysocket/react'
 import { useEffect, useState } from 'react'
-import { toast } from 'react-hot-toast'
 import { Persona } from '../constants/personas'
-import { usePersonaStore } from '../lib/usePersonaStore'
+import { useSmolTalkChat } from '../lib/hooks/use-smol-talk-chat'
 import { AlertAuth } from './alert-auth'
 import { Input } from './ui/input'
 
 const IS_PREVIEW = process.env.VERCEL_ENV === 'preview'
 export interface ChatProps extends React.ComponentProps<'div'> {
   initialMessages?: Message[]
-  id?: string
+  recentArtifacts?: Artifact[]
+  id: string
   user: any
+  children?: React.ReactNode
 }
 
-function useSmolTalkChat(
-  opts: UseChatOptions & {
-    initialMessages?: SmolTalkMessage[] // overriding just to fit our needs
-  }
-) {
-  const { initialMessages, ...rest } = opts
-  return useChat({
-    ...rest,
-    api: '/talk/api/chat',
-    initialMessages: initialMessages?.map(message => ({
-      ...message
-    }))
-  })
-}
+const identify = async (socket: PartySocket, id: string) => {
+  // the ./auth route will authenticate the connection to the partykit room
+  const url = `/talk/chat/${id}/auth?_pk=${socket._pk}`
+  const req = await fetch(url, { method: 'POST' })
 
-/* ========================================================================== */
-/* Function Call Handler                                                      */
-/* ========================================================================== */
-
-const functionCallHandler: FunctionCallHandler = async (
-  chatMessages,
-  functionCall
-) => {
-  let functionResponse: ChatRequest
-
-  /* ========================================================================== */
-  /* Handle searchTheWeb function call                                          */
-  /* ========================================================================== */
-
-  if (functionCall.name === 'searchTheWeb') {
-    if (functionCall.arguments) {
-      const parsedFunctionCallArguments = JSON.parse(functionCall.arguments)
-      const results = await searchTheWeb(parsedFunctionCallArguments.query)
-      return (functionResponse = {
-        messages: [
-          ...chatMessages,
-          {
-            id: nanoid(),
-            name: 'searchTheWeb',
-            role: 'function' as const,
-            content: JSON.stringify({
-              query: functionCall.arguments.query,
-              results:
-                results ||
-                'Sorry, I could not find anything on the internet about that.'
-            })
-          }
-        ]
-      })
-    }
-  }
-
-  /* ========================================================================== */
-  /* Handle processSearchResult function call                                   */
-  /* ========================================================================== */
-
-  if (functionCall.name === 'processSearchResult') {
-    const parsedFunctionCallArguments = JSON.parse(functionCall.arguments)
-    const processedContent = await processSearchResult(
-      parsedFunctionCallArguments.id
-    )
-
-    const { title, url, id, publishedDate, author, score } =
-      functionCall.arguments
-
-    return (functionResponse = {
-      messages: [
-        ...chatMessages,
-        {
-          id: nanoid(),
-          name: 'processSearchResult',
-          role: 'function' as const,
-          content: JSON.stringify({
-            link: {
-              title: title,
-              url: url,
-              publishedDate: publishedDate || null,
-              author: author || null,
-              score: score || null,
-              id: id
-            },
-            results: processedContent
-          })
-        }
-      ]
-    })
+  if (!req.ok) {
+    const res = await req.text()
+    console.error('Failed to authenticate connection to PartyKit room', res)
   }
 }
 
@@ -132,8 +54,16 @@ const functionCallHandler: FunctionCallHandler = async (
 /* Chat Component                                                             */
 /* ========================================================================== */
 
-export function Chat({ user, id, initialMessages, className }: ChatProps) {
+export function Chat({
+  user,
+  id,
+  recentArtifacts,
+  initialMessages,
+  className,
+  children
+}: ChatProps) {
   const { persona, setPersonas } = usePersonaStore()
+
   const [previewToken, setPreviewToken] = useLocalStorage<string | null>(
     'ai-token',
     null
@@ -143,24 +73,96 @@ export function Chat({ user, id, initialMessages, className }: ChatProps) {
 
   const [previewTokenDialog, setPreviewTokenDialog] = useState(IS_PREVIEW)
   const [previewTokenInput, setPreviewTokenInput] = useState(previewToken ?? '')
-  const { messages, append, reload, stop, isLoading, input, setInput, error } =
-    useSmolTalkChat({
-      initialMessages,
-      id,
-      body: {
-        id,
-        previewToken,
-        model: model,
-        persona: persona
-      },
-      // SWYXTODO: check this 401 issue?
-      onResponse(response) {
-        if (response.status === 401) {
-          toast.error(response.statusText)
-        }
-      },
-      experimental_onFunctionCall: functionCallHandler
+  const supabase = createClientComponentClient()
+  const session = supabase.auth.getSession()
+
+  const router = useRouter()
+  const pathname = usePathname()
+
+  const {
+    messages,
+    setMessages,
+    reload,
+    stop,
+    isLoading,
+    setIsLoading,
+    input,
+    setInput,
+    error
+  } = useSmolTalkChat({
+    initialMessages
+  })
+
+  useEffect(() => {
+    window.scrollTo({
+      top: document.body.scrollHeight,
+      behavior:
+        initialMessages?.length === messages.length ? 'instant' : 'smooth'
     })
+  }, [messages.length])
+
+  const socket = usePartySocket({
+    host: PARTYKIT_HOST,
+    room: id,
+    party: 'chat',
+    query: async () => ({
+      // get an auth token using your authentication client library
+      accessToken: (await supabase.auth.getSession()).data.session
+        ?.access_token,
+      chatId: id
+    }),
+    async onOpen(e) {
+      // identify user upon connection
+      if (!!(await session).data.session?.user && e.target) {
+        identify(e.target as PartySocket, id)
+      }
+    },
+    onMessage(event) {
+      const message = JSON.parse(event.data) as BroadcastMessage
+
+      if (message.type === 'newMessage') {
+        if (messages.length === 1 && pathname === '/') {
+          const newUrl = `/talk/chat/${id}`
+          window.history.pushState(
+            { ...window.history.state, as: newUrl, url: newUrl },
+            '',
+            newUrl
+          )
+        }
+        setMessages([...messages, message.message])
+      } else if (message.type === 'editMessage') {
+        setMessages(
+          messages.map(m => (m.id === message.message.id ? message.message : m))
+        )
+      } else if (message.type === 'finishMessage') {
+        setMessages(
+          messages.map(m => (m.id === message.message.id ? message.message : m))
+        )
+        setIsLoading(false)
+      } else if (message.type === 'logError') {
+        setMessages(
+          messages.map(m => (m.id === message.message.id ? message.message : m))
+        )
+        setIsLoading(false)
+      }
+      // if (message.type === 'sync') setMessages(message.messages)
+    }
+  })
+
+  const sendMessage = (message: Message) => {
+    setIsLoading(true)
+    const newMessage = {
+      type: 'newMessage',
+      from: { id: user.id },
+      message
+    } as BroadcastMessage
+    // const res = fetch(PARTYKIT_HOST + '/chat/' + id, {
+    //   method: 'POST',
+    //   body: JSON.stringify(newMessage),
+    //   headers: { 'Content-Type': 'application/json' }
+    // })
+    socket.send(JSON.stringify(newMessage))
+  }
 
   useEffect(() => {
     const fetchPersonas = async () => {
@@ -175,13 +177,14 @@ export function Chat({ user, id, initialMessages, className }: ChatProps) {
   return (
     <>
       <div className={cn('pb-[200px] pt-4 md:pt-10', className)}>
-        {messages.length > 0 ? (
+        {messages.length > 0 || children ? (
           <>
-            <ChatList messages={messages} />
+            {children}
+            <ChatList messages={messages} isLoading={isLoading} />
             <ChatScrollAnchor trackVisibility={isLoading} />
           </>
         ) : !isLoading ? (
-          <EmptyScreen setInput={setInput} />
+          <EmptyScreen setInput={setInput} recentArtifacts={recentArtifacts} />
         ) : null}
       </div>
       {isAuthError && <AlertAuth />}
@@ -189,7 +192,7 @@ export function Chat({ user, id, initialMessages, className }: ChatProps) {
         id={id}
         isLoading={isLoading}
         stop={stop}
-        append={append}
+        append={sendMessage as any}
         reload={reload}
         messages={messages}
         input={input}

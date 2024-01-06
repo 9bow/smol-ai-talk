@@ -3,7 +3,7 @@ name: Create PR to production Repo on Push to main
 on:
   push:
     branches:
-      - main # Trigger this workflow on push to main branch
+      - development # Trigger this workflow on push to main branch
 
 jobs:
   create-pr:
@@ -19,7 +19,7 @@ jobs:
         id: check-pr
         run: |
           # Check for existing PRs with the same head branch
-          EXISTING_PR=$(gh pr list --state open --base production --head main --json number --jq '.[0].number')
+          EXISTING_PR=$(gh pr list --state open --base main --head development --json number --jq '.[0].number')
           echo "EXISTING_PR=$EXISTING_PR" >> $GITHUB_ENV
           if [ -z "$EXISTING_PR" ]; then
             echo "No existing PR found, create a new one."
@@ -36,4 +36,4 @@ jobs:
           COMMIT_MESSAGE=$(git log -1 --pretty=%B)
           COMMIT_TITLE=$(git log -1 --pretty=%s)
           # Create PR with commit details
-          gh pr create --repo https://github.com/smol-ai/talk --base production --head main --title "[PRODUCTION] $COMMIT_TITLE" --body "$COMMIT_MESSAGE"
+          gh pr create --repo https://github.com/smol-ai/talk --base main --head development --title "[PRODUCTION] $COMMIT_TITLE" --body "$COMMIT_MESSAGE"

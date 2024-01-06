@@ -16,7 +16,7 @@ export function PromptNameField({ form }: { form: UseFormReturn }) {
   return (
     <FormField
       control={form.control}
-      name={`prompt_name`}
+      name={`name`}
       render={({ field }) => (
         <div className="flex flex-1 space-x-2">
           <FormItem className="mb-4 flex-1">
@@ -31,19 +31,6 @@ export function PromptNameField({ form }: { form: UseFormReturn }) {
             </FormDescription>
             <FormMessage />
           </FormItem>
-          <FormItem className="flex flex-col">
-            <FormLabel className="mb-2.5">Persona Color</FormLabel>
-            <FormDescription
-              className="w-24 rounded-md py-2 font-semibold"
-              style={{
-                backgroundColor: stringToColor(field.value || ''),
-                color: invertColorForText(stringToColor(field.value || '')),
-                textAlign: 'center'
-              }}
-            >
-              {stringToColor(field.value || '')}
-            </FormDescription>
-          </FormItem>
         </div>
       )}
     />
@@ -54,9 +41,11 @@ export function PromptEmojiField({ form }: { form: UseFormReturn }) {
   return (
     <FormField
       control={form.control}
-      name={`prompt_emoji`}
+      name={`emoji`}
       render={({ field }) => (
-        <FormItem>
+        <FormItem className="flex flex-col">
+          <FormLabel className="mb-2.5">Emoji</FormLabel>
+
           <FormControl>
             <EmojiPicker value={field.value} onChange={field.onChange} />
           </FormControl>
@@ -71,7 +60,7 @@ export function PromptBodyField({ form }: { form: UseFormReturn }) {
   return (
     <FormField
       control={form.control}
-      name={`prompt_body`}
+      name={`body`}
       render={({ field }) => (
         <FormItem>
           <FormLabel>Persona Instructions</FormLabel>
