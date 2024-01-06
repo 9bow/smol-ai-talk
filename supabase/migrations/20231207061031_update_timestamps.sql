@@ -12,7 +12,7 @@ alter table "public"."submissions" add column "updated_at" timestamp with time z
 
 alter table "public"."taxonomies" alter column "updated_at" set default now();
 
-alter table "public"."users" add column "created_at" timestamp with time zone not null;
+alter table "public"."users" add column "created_at" timestamp with time zone not null default now();
 
 alter table "public"."users" add column "deleted_at" timestamp with time zone;
 
